@@ -24,6 +24,7 @@
 extern crate ansi_term;
 extern crate env_logger;
 extern crate log;
+extern crate dogstatsd;
 
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -31,17 +32,31 @@ use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use ansi_term::{Color, Style};
 use env_logger::Builder;
 use log::Level;
+use dogstatsd::{Client, Options};
 
 struct ColorLevel(Level);
 
 impl fmt::Display for ColorLevel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.0 {
-            Level::Trace => Color::Purple.paint("TRACE"),
-            Level::Debug => Color::Blue.paint("DEBUG"),
-            Level::Info => Color::Green.paint("INFO "),
-            Level::Warn => Color::Yellow.paint("WARN "),
-            Level::Error => Color::Red.paint("ERROR")
+            Level::Trace => Color::Purple.paint("TRC"),
+            Level::Debug => Color::Blue.paint("DBG"),
+            Level::Info => Color::Green.paint("LOG"),
+            Level::Warn => Color::Yellow.paint("WRN"),
+            Level::Error => Color::Red.paint("ERR")
+        }.fmt(f)
+    }
+}
+
+struct DogLevel(Level);
+impl fmt::Display for DogLevel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0 {
+            Level::Trace => "trace",
+            Level::Debug => "debug",
+            Level::Info => "info",
+            Level::Warn => "warning",
+            Level::Error => "error",
         }.fmt(f)
     }
 }
@@ -123,7 +138,9 @@ pub fn try_init_custom_env(environment_variable_name: &str) -> Result<(), log::S
 pub fn formatted_builder() -> Result<Builder, log::SetLoggerError> {
     let mut builder = Builder::new();
 
-    builder.format(|f, record| {
+    let dog = Client::new(Options::default()).unwrap();
+
+    builder.format(move |f, record| {
         use std::io::Write;
         if let Some(module_path) = record.module_path() {
             let mut max_width = MAX_MODULE_WIDTH.load(Ordering::Relaxed);
@@ -131,6 +148,14 @@ pub fn formatted_builder() -> Result<Builder, log::SetLoggerError> {
                 MAX_MODULE_WIDTH.store(module_path.len(), Ordering::Relaxed);
                 max_width = module_path.len();
             }
+
+            // our dirty datadog hack, maybe we shouldn't do it here
+            let tags = vec![
+                format!("level:{}", DogLevel(record.level())),
+                format!("module:{}", module_path),
+            ];
+            dog.event(module_path, &format!("{}", record.args()), tags).unwrap();
+
             writeln!(f, " {} {} > {}",
                      ColorLevel(record.level()),
                      Style::new().bold().paint(format!("{: <width$}", module_path, width=max_width)),
@@ -139,7 +164,6 @@ pub fn formatted_builder() -> Result<Builder, log::SetLoggerError> {
             writeln!(f, " {} > {}",
                      ColorLevel(record.level()),
                      record.args())
-
         }
     });
 
