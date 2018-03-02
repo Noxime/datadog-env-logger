@@ -1,4 +1,4 @@
-extern crate pretty_env_logger;
+extern crate funky_logger;
 #[macro_use] extern crate log;
 
 use std::env;
@@ -14,7 +14,7 @@ fn main() {
 
     env::set_var("RUST_APP_LOG", "trace");
 
-    pretty_env_logger::init_custom_env("RUST_APP_LOG");
+    funky_logger::init_custom_env("RUST_APP_LOG");
 
     info!("such information");
     info!("such information");

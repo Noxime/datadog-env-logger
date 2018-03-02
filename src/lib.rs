@@ -12,20 +12,6 @@ use env_logger::Builder;
 use log::Level;
 use dogstatsd::{Client, Options};
 
-struct ColorLevel(Level);
-
-impl fmt::Display for ColorLevel {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 {
-            Level::Trace => Color::Purple.paint("TRC"),
-            Level::Debug => Color::Blue.paint("DBG"),
-            Level::Info => Color::Green.paint("LOG"),
-            Level::Warn => Color::Yellow.paint("WRN"),
-            Level::Error => Color::Red.paint("ERR")
-        }.fmt(f)
-    }
-}
-
 struct DogLevel(Level);
 impl fmt::Display for DogLevel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -86,7 +72,22 @@ pub fn formatted_builder() -> Result<Builder, log::SetLoggerError> {
         let time = format!("{}:{:02}:{:02}.{:03}",
             hours, mins, secs, 0
         );
-        let l = ColorLevel(record.level());
+
+        let color = match record.level() {
+            Level::Trace => Color::Purple,
+            Level::Debug => Color::Blue,
+            Level::Info => Color::Green,
+            Level::Warn => Color::Yellow,
+            Level::Error => Color::Red,
+        };
+
+        let l = match record.level() {
+            Level::Trace => "TRC",
+            Level::Debug => "DBG",
+            Level::Info => "LOG",
+            Level::Warn => "WRN",
+            Level::Error => "ERR",
+        };
 
         if let Some(module_path) = record.module_path() {
 
@@ -97,15 +98,10 @@ pub fn formatted_builder() -> Result<Builder, log::SetLoggerError> {
             ];
             dog.event(module_path, &format!("{}", record.args()), tags).unwrap();
             
-
-            writeln!(f, "{} {}",
-                    l,
-                    Style::new().bold().paint(format!("[{} {}]",
-                        time,
-                        module_path)));
+            let header = format!("[{} {} {}]", l, time, module_path);
             writeln!(f, "{} {}", 
-                l,
-                format!("{}",record.args()).replace("\n", &format!("\n{} ", l)))
+                Style::new().fg(color).bold().paint(header.clone()),
+                format!("{}",record.args()).replace("\n", &format!("\n{: <width$} ",  " ", width=header.len())))
         } else {
             writeln!(f, "{} {}",
                     l,

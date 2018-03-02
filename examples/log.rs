@@ -1,4 +1,4 @@
-extern crate pretty_env_logger;
+extern crate funky_logger;
 #[macro_use] extern crate log;
 
 mod nested {
@@ -8,7 +8,7 @@ mod nested {
 }
 
 fn main() {
-    pretty_env_logger::init();
+    funky_logger::init();
 
     if !log_enabled!(log::Level::Trace) {
         eprintln!("To see the full demo, try setting `RUST_LOG=log=trace`.");
