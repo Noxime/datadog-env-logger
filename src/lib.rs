@@ -70,7 +70,7 @@ pub fn formatted_builder() -> Result<Builder, log::SetLoggerError> {
         let mins = d.as_secs() / 60 % 60;
         let hours = d.as_secs() / 3600;
         let time = format!("{}:{:02}:{:02}.{:03}",
-            hours, mins, secs, 0
+            hours, mins, secs, d.subsec_nanos() / 1_000_000
         );
 
         let color = match record.level() {
@@ -96,20 +96,17 @@ pub fn formatted_builder() -> Result<Builder, log::SetLoggerError> {
                 format!("level:{}", DogLevel(record.level())),
                 format!("module:{}", module_path),
             ];
-            dog.event(module_path, &format!("{}", record.args()), tags).unwrap();
+            dog.event(format!("[{} {}] {}", l, time, module_path), format!("{}", record.args()), tags).unwrap();
             
             let header = format!("[{} {} {}]", l, time, module_path);
             writeln!(f, "{} {}", 
                 Style::new().fg(color).bold().paint(header.clone()),
                 format!("{}",record.args()).replace("\n", &format!("\n{: <width$} ",  " ", width=header.len())))
         } else {
-            writeln!(f, "{} {}",
-                    l,
-                    Style::new().bold().paint(format!("[{}]",
-                        time)));
+            let header = format!("[{} {}]", l, time);
             writeln!(f, "{} {}", 
-                l,
-                format!("{}",record.args()).replace("\n", &format!("\n{} ", l)))
+                Style::new().fg(color).bold().paint(header.clone()),
+                format!("{}",record.args()).replace("\n", &format!("\n{: <width$} ",  " ", width=header.len())))
         }
     });
 
@@ -121,11 +118,16 @@ mod tests {
     #[test]
     fn log_types() {
         use init;
+        use std::thread::sleep_ms;
         init();
         trace!("We are tracing now!");
+        sleep_ms(20);
         debug!("Debugging works fine");
+        sleep_ms(131);
         info!("This is an info level message: {}", 3 + 5);
+        sleep_ms(540);
         warn!("Warnings should be yellowish\nOh and by the way this is multiline");
+        sleep_ms(543);
         error!("Oofie owie this is serious");
     }
 }
